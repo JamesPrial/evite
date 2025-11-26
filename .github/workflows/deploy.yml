@@ -1,0 +1,140 @@
+name: Deploy E-vite App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Minimal permissions for security
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Prevent concurrent deployments
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Frontend deployment to GitHub Pages
+  frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm build
+        env:
+          # Set this in Repository Settings > Secrets and variables > Actions > Variables
+          # Format: https://your-worker.your-subdomain.workers.dev
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Worker deployment to Cloudflare
+  worker:
+    name: Deploy Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-worker-${{ hashFiles('worker/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-worker-
+
+      - name: Install worker dependencies
+        working-directory: ./worker
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy to Cloudflare Workers
+        working-directory: ./worker
+        run: pnpm wrangler deploy
+        env:
+          # Set this in Repository Settings > Secrets and variables > Actions > Secrets
+          # Get your token from: https://dash.cloudflare.com/profile/api-tokens
+          # Required permissions: Account.Cloudflare Workers Scripts (Edit)
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+# Setup Instructions:
+# 1. Enable GitHub Pages:
+#    - Go to Settings > Pages
+#    - Source: GitHub Actions
+#
+# 2. Set Repository Variables:
+#    - Go to Settings > Secrets and variables > Actions > Variables
+#    - Add VITE_API_URL with your Cloudflare Worker URL
+#      Example: https://evite-worker.your-subdomain.workers.dev
+#
+# 3. Set Repository Secrets:
+#    - Go to Settings > Secrets and variables > Actions > Secrets
+#    - Add CLOUDFLARE_API_TOKEN with your API token from Cloudflare
+#      Create token at: https://dash.cloudflare.com/profile/api-tokens
+#      Required permissions: Account.Cloudflare Workers Scripts (Edit)
+#
+# 4. Push to main branch to trigger deployment

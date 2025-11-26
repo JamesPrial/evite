@@ -1,0 +1,12 @@
+name = "evite-rsvp"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "RSVPS"
+id = "YOUR_KV_NAMESPACE_ID"
+# Run: wrangler kv:namespace create RSVPS
+# Then replace YOUR_KV_NAMESPACE_ID with the actual ID
+
+[vars]
+# ADMIN_KEY is set via: wrangler secret put ADMIN_KEY

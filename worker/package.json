@@ -1,0 +1,17 @@
+{
+  "name": "evite-worker",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241112.0",
+    "wrangler": "^3.91.0",
+    "typescript": "^5.6.2"
+  }
+}
